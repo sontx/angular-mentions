@@ -1,4 +1,13 @@
-import { ComponentFactoryResolver, Directive, ElementRef, TemplateRef, ViewContainerRef } from "@angular/core";
+import {
+  ApplicationRef,
+  ComponentFactoryResolver,
+  ComponentRef,
+  Directive,
+  ElementRef, Injector,
+  OnDestroy,
+  TemplateRef,
+  ViewContainerRef
+} from '@angular/core';
 import { EventEmitter, Input, OnChanges, Output, SimpleChanges } from "@angular/core";
 import { getCaretPosition, getValue, insertValue, setCaretPosition } from './mention-utils';
 
@@ -32,7 +41,7 @@ const KEY_BUFFERED = 229;
     'autocomplete': 'off'
   }
 })
-export class MentionDirective implements OnChanges {
+export class MentionDirective implements OnChanges, OnDestroy {
 
   // stores the items passed to the mentions directive and used to populate the root items in mentionConfig
   private mentionItems: any[];
@@ -84,17 +93,26 @@ export class MentionDirective implements OnChanges {
   private searching: boolean;
   private iframe: any; // optional
   private lastKeyCode: number;
+  private componentRef?: ComponentRef<MentionListComponent>;
 
   constructor(
     private _element: ElementRef,
     private _componentResolver: ComponentFactoryResolver,
-    private _viewContainerRef: ViewContainerRef
+    private _viewContainerRef: ViewContainerRef,
+    private app: ApplicationRef,
+    private injector: Injector,
   ) { }
 
   ngOnChanges(changes: SimpleChanges) {
     // console.log('config change', changes);
     if (changes['mention'] || changes['mentionConfig']) {
       this.updateConfig();
+    }
+  }
+
+  ngOnDestroy() {
+    if (this.componentRef) {
+      this.app.detachView(this.componentRef.hostView);
     }
   }
 
@@ -303,7 +321,7 @@ export class MentionDirective implements OnChanges {
           if (this.activeConfig.returnTrigger) {
             const triggerChar = (this.searchString || event.keyCode === KEY_BACKSPACE) ? val.substring(this.startPos, this.startPos + 1) : '';
             this.searchTerm.emit(triggerChar + this.searchString);
-          } 
+          }
           else {
             this.searchTerm.emit(this.searchString);
           }
@@ -356,13 +374,22 @@ export class MentionDirective implements OnChanges {
     this.opened.emit();
 
     if (this.searchList == null) {
-      let componentFactory = this._componentResolver.resolveComponentFactory(MentionListComponent);
-      let componentRef = this._viewContainerRef.createComponent(componentFactory);
+      const componentFactory = this._componentResolver.resolveComponentFactory(MentionListComponent);
+      let componentRef: ComponentRef<MentionListComponent>;
+      if (this.activeConfig.container === 'body') {
+        const containerElement = document.createElement('div');
+        document.body.append(containerElement);
+        componentRef = componentFactory.create(this.injector, [], containerElement);
+        this.app.attachView(componentRef.hostView);
+        this.componentRef = componentRef;
+      } else {
+        componentRef = this._viewContainerRef.createComponent(componentFactory);
+      }
       this.searchList = componentRef.instance;
       this.searchList.itemTemplate = this.mentionListTemplate;
-      componentRef.instance['itemClick'].subscribe(() => {
+      componentRef.instance.itemClick.subscribe(() => {
         nativeElement.focus();
-        let fakeKeydown = { key: 'Enter', keyCode: KEY_ENTER, wasClick: true };
+        const fakeKeydown = { key: 'Enter', keyCode: KEY_ENTER, wasClick: true };
         this.keyHandler(fakeKeydown, nativeElement);
       });
     }

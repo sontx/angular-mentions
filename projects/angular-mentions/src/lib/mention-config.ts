@@ -3,9 +3,9 @@
 export interface MentionConfig extends Mentions {
   // nested config
   mentions?:Mentions[];
-  
+
   // option to disable encapsulated styles so global styles can be used instead
-  disableStyle?:boolean;  
+  disableStyle?:boolean;
 }
 
 export interface Mentions {
@@ -42,4 +42,6 @@ export interface Mentions {
 
   // optional function to customize the search implementation
   mentionFilter?:(searchString:string, items?:any) => (any[]);
+
+  container?: 'auto' | 'body';
 }

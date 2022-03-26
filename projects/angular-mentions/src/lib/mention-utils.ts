@@ -1,6 +1,8 @@
 // DOM element manipulation functions...
 //
 
+import {core} from '@angular/compiler';
+
 function setValue(el: HTMLInputElement, value: any) {
   //console.log("setValue", el.nodeName, "["+value+"]");
   if (isInputOrTextAreaElement(el)) {
@@ -145,6 +147,14 @@ function localToRelativeCoordinates(
 ) {
   let obj = <HTMLElement>element;
   let iframe = ctx ? ctx.iframe : null;
+
+  if (!iframe) {
+    const bound = element.getBoundingClientRect();
+    coordinates.top = bound.top;
+    coordinates.left = bound.left;
+    return;
+  }
+
   while (obj) {
     if (ctx.parent != null && ctx.parent == obj) {
       break;

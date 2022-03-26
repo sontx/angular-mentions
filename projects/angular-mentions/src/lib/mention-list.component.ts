@@ -1,5 +1,5 @@
 import {
-  Component, ElementRef, Output, EventEmitter, ViewChild, Input, TemplateRef, AfterContentChecked
+  Component, ElementRef, Output, EventEmitter, ViewChild, Input, TemplateRef, AfterContentChecked, OnDestroy
 } from '@angular/core';
 
 import { isInputOrTextAreaElement, getContentEditableCaretCoords } from './mention-utils';
@@ -28,13 +28,18 @@ import { getCaretCoordinates } from './caret-coords';
         </a>
       </li>
     </ul>
-    `
+    `,
+  host: {
+    class: 'mention-list',
+    '[style.position]': '"fixed"',
+    '[style.zIndex]': '10000'
+  }
 })
 export class MentionListComponent implements AfterContentChecked {
   @Input() labelKey: string = 'label';
   @Input() itemTemplate: TemplateRef<any>;
   @Output() itemClick = new EventEmitter();
-  @ViewChild('list', { static: true }) list: ElementRef;
+  @ViewChild('list', { static: true }) list: ElementRef<HTMLElement>;
   @ViewChild('defaultItemTemplate', { static: true }) defaultItemTemplate: TemplateRef<any>;
   items = [];
   activeIndex: number = 0;
@@ -55,9 +60,10 @@ export class MentionListComponent implements AfterContentChecked {
   position(nativeParentElement: HTMLInputElement, iframe: HTMLIFrameElement = null) {
     if (isInputOrTextAreaElement(nativeParentElement)) {
       // parent elements need to have postition:relative for this to work correctly?
+      const bound = nativeParentElement.getBoundingClientRect();
       this.coords = getCaretCoordinates(nativeParentElement, nativeParentElement.selectionStart, null);
-      this.coords.top = nativeParentElement.offsetTop + this.coords.top - nativeParentElement.scrollTop;
-      this.coords.left = nativeParentElement.offsetLeft + this.coords.left - nativeParentElement.scrollLeft;
+      this.coords.top = this.coords.top + bound.top - nativeParentElement.scrollTop;
+      this.coords.left = this.coords.left + bound.left - nativeParentElement.scrollLeft;
       // getCretCoordinates() for text/input elements needs an additional offset to position the list correctly
       this.offset = this.getBlockCursorDimensions(nativeParentElement).height;
     }
@@ -67,13 +73,13 @@ export class MentionListComponent implements AfterContentChecked {
     }
     else {
       let doc = document.documentElement;
-      let scrollLeft = (window.pageXOffset || doc.scrollLeft) - (doc.clientLeft || 0);
-      let scrollTop = (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0);
+      // let scrollLeft = (window.pageXOffset || doc.scrollLeft) - (doc.clientLeft || 0);
+      // let scrollTop = (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0);
       // bounding rectangles are relative to view, offsets are relative to container?
       let caretRelativeToView = getContentEditableCaretCoords({ iframe: iframe });
-      let parentRelativeToContainer: ClientRect = nativeParentElement.getBoundingClientRect();
-      this.coords.top = caretRelativeToView.top - parentRelativeToContainer.top + nativeParentElement.offsetTop - scrollTop;
-      this.coords.left = caretRelativeToView.left - parentRelativeToContainer.left + nativeParentElement.offsetLeft - scrollLeft;
+      this.coords.top = caretRelativeToView.top;
+      this.coords.left = caretRelativeToView.left;
+      this.offset = this.getBlockCursorDimensions(nativeParentElement).height;
     }
     // set the default/inital position
     this.positionElement();
@@ -127,19 +133,31 @@ export class MentionListComponent implements AfterContentChecked {
   // ensure it's in the page bounds
   private checkBounds() {
     let left = this.coords.left, top = this.coords.top, dropUp = this.dropUp;
+    this.list.nativeElement.style.maxHeight = null;
     const bounds: ClientRect = this.list.nativeElement.getBoundingClientRect();
     // if off right of page, align right
     if (bounds.left + bounds.width > window.innerWidth) {
       left -= bounds.left + bounds.width - window.innerWidth + 10;
     }
+
+    // is overlapped by page, try to show as dropUp
+    if (top + this.offset + bounds.height > window.innerHeight) {
+      if (top - bounds.height >= 0) {
+        dropUp = true;
+        top = top - bounds.height;
+      } else {
+        this.list.nativeElement.style.maxHeight = `${window.innerHeight - bounds.top}px`;
+      }
+    }
+
     // if more than half off the bottom of the page, force dropUp
     // if ((bounds.top+bounds.height/2)>window.innerHeight) {
     //   dropUp = true;
     // }
     // if top is off page, disable dropUp
-    if (bounds.top<0) {
-      dropUp = false;
-    }
+    // if (bounds.top<0) {
+    //   dropUp = false;
+    // }
     // set the revised/final position
     this.positionElement(left, top, dropUp);
   }
@@ -147,8 +165,10 @@ export class MentionListComponent implements AfterContentChecked {
   private positionElement(left:number=this.coords.left, top:number=this.coords.top, dropUp:boolean=this.dropUp) {
     const el: HTMLElement = this.element.nativeElement;
     top += dropUp ? 0 : this.offset; // top of list is next line
-    el.className = dropUp ? 'dropup' : null;
-    el.style.position = "absolute";
+    // tslint:disable-next-line:no-non-null-assertion
+    // const menu = this.element.nativeElement.querySelector('.dropdown-menu')!;
+    // top = dropUp ? (top - menu.getBoundingClientRect().height) : top + this.offset;
+    // el.className = dropUp ? 'dropup' : null;
     el.style.left = left + 'px';
     el.style.top = top + 'px';
   }
