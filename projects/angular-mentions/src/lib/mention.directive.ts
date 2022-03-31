@@ -367,6 +367,7 @@ export class MentionDirective implements OnChanges, OnDestroy {
     if (this.searchList) {
       this.searchList.items = matches;
       this.searchList.hidden = matches.length == 0;
+      window.requestAnimationFrame(() => this.searchList.checkBounds());
     }
   }
 

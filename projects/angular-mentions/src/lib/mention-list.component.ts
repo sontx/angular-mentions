@@ -131,7 +131,7 @@ export class MentionListComponent implements AfterContentChecked {
 
   // final positioning is done after the list is shown (and the height and width are known)
   // ensure it's in the page bounds
-  private checkBounds() {
+  checkBounds() {
     let left = this.coords.left, top = this.coords.top, dropUp = this.dropUp;
     this.list.nativeElement.style.maxHeight = null;
     const bounds: ClientRect = this.list.nativeElement.getBoundingClientRect();
